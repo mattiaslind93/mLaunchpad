@@ -243,6 +243,7 @@ class HomeLaunchPad:
 
         # Core paths
         env["JOBS"] = str(self.jobs_path)
+        env["JOBROOT"] = str(self.jobs_path)
         env["SYSTEM"] = str(self.system_path)
         env["USER_NAME"] = self.user_name
 

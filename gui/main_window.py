@@ -370,15 +370,19 @@ class MainWindow(QMainWindow):
         else:
             self.status_label.setText("Select project, sequence, and shot")
 
+        # Always show which source and base path is active
+        source_name = self.launchpad.current_source_name
+        jobs_path = self.launchpad.jobs_path
+        self.path_label.setText(f"[{source_name}] {jobs_path}")
+
     def _update_title(self):
-        """Update window title with current path."""
+        """Update window title with current path and source info."""
         job_path = self.launchpad.get_job_path()
+        source_name = self.launchpad.current_source_name
         if job_path:
-            self.setWindowTitle(f"HomeLaunchPad - {job_path}")
-            self.path_label.setText(job_path)
+            self.setWindowTitle(f"HomeLaunchPad - [{source_name}] {job_path}")
         else:
-            self.setWindowTitle("HomeLaunchPad")
-            self.path_label.setText("")
+            self.setWindowTitle(f"HomeLaunchPad - [{source_name}]")
 
     def _launch_blender(self):
         """Launch Blender with the current environment."""
