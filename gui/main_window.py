@@ -98,6 +98,19 @@ class MainWindow(QMainWindow):
             self.source_combo.setCurrentIndex(current_idx)
         title_layout.addWidget(self.source_combo)
 
+        title_layout.addSpacing(15)
+
+        # Blender version selector
+        blender_label = QLabel("Blender:")
+        blender_label.setObjectName("sourceLabel")
+        title_layout.addWidget(blender_label)
+
+        self.blender_combo = QComboBox()
+        self.blender_combo.setObjectName("blenderCombo")
+        self.blender_combo.setMinimumWidth(100)
+        self._populate_blender_versions()
+        title_layout.addWidget(self.blender_combo)
+
         self.path_label = QLabel("")
         self.path_label.setAlignment(Qt.AlignmentFlag.AlignRight)
         title_layout.addWidget(self.path_label, 1)
@@ -223,6 +236,7 @@ class MainWindow(QMainWindow):
     def _connect_signals(self):
         """Connect UI signals to slots."""
         self.source_combo.currentIndexChanged.connect(self._on_source_changed)
+        self.blender_combo.currentIndexChanged.connect(self._on_blender_changed)
         self.project_list.currentItemChanged.connect(self._on_project_changed)
         self.sequence_list.currentItemChanged.connect(self._on_sequence_changed)
         self.shot_list.currentItemChanged.connect(self._on_shot_changed)
@@ -312,6 +326,26 @@ class MainWindow(QMainWindow):
             self._update_title()
             # Check availability in background (will show warning if unavailable)
             self._update_source_availability()
+
+    def _populate_blender_versions(self):
+        """Populate the Blender version dropdown with available versions."""
+        versions = self.launchpad.get_available_blender_versions()
+        current_executable = self.launchpad.blender_executable
+
+        for version, executable_path in versions:
+            self.blender_combo.addItem(f"v{version}", executable_path)
+
+        # Select the currently configured version
+        current_idx = self.blender_combo.findData(current_executable)
+        if current_idx >= 0:
+            self.blender_combo.setCurrentIndex(current_idx)
+
+    def _on_blender_changed(self, index):
+        """Handle Blender version selection change."""
+        executable_path = self.blender_combo.currentData()
+        if executable_path and executable_path != self.launchpad.blender_executable:
+            self.launchpad.set_blender_version(executable_path)
+            self.launcher.blender_executable = executable_path
 
     def _on_shot_changed(self, current, previous):
         """Handle shot selection change."""

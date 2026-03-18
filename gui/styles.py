@@ -71,6 +71,40 @@ QComboBox#sourceCombo QAbstractItemView {
     outline: none;
 }
 
+QComboBox#blenderCombo {
+    background-color: #404040;
+    border: 1px solid #505050;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #e87d0d;
+    min-width: 80px;
+}
+
+QComboBox#blenderCombo:hover {
+    background-color: #4a4a4a;
+    border-color: #e87d0d;
+}
+
+QComboBox#blenderCombo::drop-down {
+    border: none;
+    padding-right: 8px;
+}
+
+QComboBox#blenderCombo::down-arrow {
+    image: none;
+    border-left: 4px solid transparent;
+    border-right: 4px solid transparent;
+    border-top: 6px solid #e87d0d;
+    margin-right: 4px;
+}
+
+QComboBox#blenderCombo QAbstractItemView {
+    background-color: #323232;
+    border: 1px solid #505050;
+    selection-background-color: #e87d0d;
+    outline: none;
+}
+
 QListWidget {
     background-color: #1e1e1e;
     border: 1px solid #404040;

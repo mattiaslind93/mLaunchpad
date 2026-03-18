@@ -2,6 +2,7 @@
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Optional
 
@@ -23,8 +24,11 @@ class HomeLaunchPad:
         "tools",
     }
 
+    BLENDER_CONFIG_DIR = Path.home() / "Dokument" / "Blender" / "blender_config"
+
     def __init__(self):
         self.config = self._load_config()
+        self._ensure_latest_blender()
         self.current_source: str = self.config.get("current_source", "milford")
         self.current_project: Optional[str] = self.config.get("last_project")
         self.current_sequence: Optional[str] = self.config.get("last_sequence")
@@ -56,7 +60,7 @@ class HomeLaunchPad:
             },
             "current_source": "private",
             "user_name": os.environ.get("USER", "unknown"),
-            "blender_executable": "/home/mlind/Dokument/Blender/blender_config/blender-5.0.1-linux-x64/blender",
+            "blender_executable": self._get_latest_blender_executable() or "",
             "last_project": None,
             "last_sequence": None,
             "last_shot": None,
@@ -166,6 +170,50 @@ class HomeLaunchPad:
     def blender_executable(self) -> str:
         """Return the Blender executable path from config."""
         return self.config["blender_executable"]
+
+    def get_available_blender_versions(self) -> list[tuple[str, str]]:
+        """Discover available Blender versions from the blender_config directory.
+
+        Returns:
+            List of (version_string, executable_path) tuples, sorted newest first.
+        """
+        versions = []
+        if not self.BLENDER_CONFIG_DIR.exists():
+            return versions
+
+        pattern = re.compile(r"^blender-(\d+\.\d+\.\d+)-linux-x64$")
+        for entry in self.BLENDER_CONFIG_DIR.iterdir():
+            if entry.is_dir():
+                match = pattern.match(entry.name)
+                if match:
+                    executable = entry / "blender"
+                    if executable.exists():
+                        versions.append((match.group(1), str(executable)))
+
+        # Sort by version number, newest first
+        versions.sort(key=lambda v: [int(x) for x in v[0].split(".")], reverse=True)
+        return versions
+
+    def _get_latest_blender_executable(self) -> Optional[str]:
+        """Return the executable path for the latest available Blender version."""
+        versions = self.get_available_blender_versions()
+        if versions:
+            return versions[0][1]
+        return None
+
+    def _ensure_latest_blender(self):
+        """If the configured blender executable doesn't exist, fall back to latest available."""
+        current = self.config.get("blender_executable", "")
+        if not current or not Path(current).exists():
+            latest = self._get_latest_blender_executable()
+            if latest:
+                self.config["blender_executable"] = latest
+                self.save_config()
+
+    def set_blender_version(self, executable_path: str):
+        """Set the Blender executable path and save config."""
+        self.config["blender_executable"] = executable_path
+        self.save_config()
 
     def _list_directories(self, path: Path) -> list[str]:
         """List directories at path, excluding hidden and special folders."""
