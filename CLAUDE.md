@@ -20,7 +20,8 @@ homelaunchpad/
 ├── core/
 │   ├── __init__.py      # Exporterar HomeLaunchPad
 │   ├── launchpad.py     # Kärnlogik: läser projekt/sekvenser/shots, bygger miljö
-│   └── launcher.py      # Startar Blender, terminal, filhanterare
+│   ├── launcher.py      # Startar Blender, terminal, filhanterare
+│   └── platform_utils.py # OS-detektering: Blender-upptäckt + default-källor (Linux/macOS)
 ├── gui/
 │   ├── __init__.py
 │   ├── main_window.py   # Huvudfönster med listor och knappar
@@ -55,6 +56,13 @@ Konfigurationsfilen ligger på `~/.homelaunchpad/config.json`:
 }
 ```
 
+> **Plattform:** Exemplet ovan visar Linux-sökvägar. Vid första körningen skapas
+> default-konfigurationen plattformsanpassad (se `core/platform_utils.py`). På macOS
+> blir det t.ex. `blender_executable: /Applications/Blender.app/Contents/MacOS/Blender`,
+> `private.jobs_path: ~/Insync/mattiaslind93@gmail.com/Google Drive/Pipeline` och
+> `milford.jobs_path: /Volumes/jack/JOBS`. Befintliga config-filer skrivs aldrig om
+> automatiskt – redigera `config.json` själv om sökvägarna behöver justeras.
+
 | Nyckel | Beskrivning |
 |--------|-------------|
 | `sources` | Dictionary med projekt-källor (se nedan) |
@@ -81,6 +89,7 @@ När en applikation startas sätts följande miljövariabler:
 | Variabel | Exempel | Beskrivning |
 |----------|---------|-------------|
 | `JOBS` | `/var/mnt/jack/JOBS` | Rot för alla projekt |
+| `JOBROOT` | `/var/mnt/jack/JOBS` | Samma som `JOBS` (alias som Blender-addon förväntar sig) |
 | `SYSTEM` | `/var/mnt/jack/SYSTEM` | Systemverktyg och pipeline |
 | `USER_NAME` | `mlind` | Aktuell användare |
 | `MF_ROOT` | `$SYSTEM/TOOLS/mfpipeline/pipeline_v7.0.0` | Pipeline-rot |
@@ -92,22 +101,61 @@ När en applikation startas sätts följande miljövariabler:
 
 ## Körning
 
+**Linux:**
 ```bash
 cd ~/projects/homelaunchpad
 python main.py
 ```
-
 Eller via desktop-filen: `~/.local/share/applications/homelaunchpad.desktop`
+
+**macOS:**
+Rekommenderat: bygg en riktig `.app` (visas i Launchpad/Dock med Milford-ikonen):
+```bash
+./build_macos_app.sh          # installerar /Applications/HomeLaunchPad.app
+```
+`.app`-paketet är en tunn wrapper som kör repots `.venv` på `main.py`, så det
+startar alltid senaste koden. Ikonen genereras från `icons/homelaunchpad_icon.png`.
+
+Alternativ: dubbelklicka `homelaunchpad.command` i Finder, eller kör manuellt:
+```bash
+cd ~/Documents/GItHub/mLaunchpad
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
+.venv/bin/python main.py
+```
+
+> **OBS (macOS):** PyQt6-bindningarna och Qt6-biblioteken måste ha *samma* version,
+> annars vägrar Qt ladda sina plattforms-plugins och appen kraschar direkt vid start
+> (symptom: `Could not find the Qt platform plugin "cocoa"`). Därför är båda pinnade
+> i `requirements.txt`.
 
 ## Beroenden
 
-- Python 3.10+
+- Python 3.9+ (3.10+ rekommenderas)
 - PyQt6
 
 Installation:
 ```bash
 pip install PyQt6
 ```
+
+## Plattformsstöd (Linux & macOS)
+
+Appen körs på både Linux och macOS. All OS-specifik logik är samlad i
+`core/platform_utils.py` (`IS_MAC`/`IS_LINUX` via `sys.platform`). Skillnaderna:
+
+| Område | Linux | macOS |
+|--------|-------|-------|
+| Blender-upptäckt | `~/Dokument/Blender/blender_config/blender-X.Y.Z-linux-x64/blender` | `Blender*.app` i `/Applications` och `~/Applications` (version läses från Info.plist) |
+| Blender-binär | `.../blender` | `Blender.app/Contents/MacOS/Blender` (inre binären, så env kan sättas) |
+| Terminal | gnome-terminal, konsole, xfce4-terminal, xterm, kitty, alacritty | Terminal.app via AppleScript (`osascript`) som re-exporterar JOB-variablerna |
+| Filhanterare | nautilus, dolphin, thunar, nemo, pcmanfm, xdg-open | Finder via `open` |
+| JOBS-montering | `/var/mnt/jack/...` | `/Volumes/jack/...` (SMB-share) |
+| Privat-källa | `/home/mlind/Insync/...` | `~/Insync/.../Google Drive/Pipeline` |
+
+> På macOS kan `open`/`open -a` inte skicka med en egen miljö, så terminalen
+> startas via AppleScript där JOB-variablerna (`JOBPROJ`, `SHOTPATH`, …)
+> re-exporteras explicit i den nya shell-sessionen.
 
 ## Exkluderade mappar
 
@@ -119,14 +167,19 @@ Följande mappar visas inte i listorna (definierade i `core/launchpad.py`):
 
 ## Känt problem: Sökvägar
 
-Blender-addons kan förvänta sig sökvägar som `/jack/JOBS/...` medan systemet monterar på `/var/mnt/jack/JOBS/...`.
+Blender-addons kan förvänta sig sökvägar som `/jack/JOBS/...` medan systemet monterar på `/var/mnt/jack/JOBS/...` (Linux) eller `/Volumes/jack/JOBS/...` (macOS).
 
-**Lösning:** Skapa en symlink:
+**Lösning (Linux):** Skapa en symlink:
 ```bash
 sudo ln -s /var/mnt/jack /jack
 ```
 
-Alternativt: Uppdatera `config.json` så att `jobs_path` och `system_path` använder `/jack/` istället för `/var/mnt/jack/`.
+**Lösning (macOS):** Skapa en symlink mot monteringen under `/Volumes`:
+```bash
+sudo ln -s /Volumes/jack /jack
+```
+
+Alternativt: Uppdatera `config.json` så att `jobs_path` och `system_path` använder `/jack/`.
 
 ## Felsökning
 
@@ -136,8 +189,9 @@ Alternativt: Uppdatera `config.json` så att `jobs_path` och `system_path` anvä
 
 **Inga projekt visas:**
 - Kontrollera att `jobs_path` är korrekt och att mappen är monterad
-- Kör `ls /var/mnt/jack/JOBS` för att verifiera
+- Linux: kör `ls /var/mnt/jack/JOBS`, macOS: kör `ls /Volumes/jack/JOBS` för att verifiera
+- macOS: en otillgänglig källa (t.ex. Milford utan VPN/monterad share) gråas ut i dropdownen
 
 **Terminal öppnas inte:**
-- Appen försöker hitta: gnome-terminal, konsole, xfce4-terminal, xterm, kitty, alacritty
-- Installera en av dessa om ingen finns
+- Linux: appen försöker hitta gnome-terminal, konsole, xfce4-terminal, xterm, kitty, alacritty – installera en om ingen finns
+- macOS: använder Terminal.app via `osascript`; om inget händer, kontrollera att appen har behörighet att styra Terminal (System­inställningar → Sekretess & säkerhet → Automation)

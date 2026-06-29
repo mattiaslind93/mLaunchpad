@@ -8,7 +8,7 @@ QMainWindow {
 QWidget {
     background-color: #2b2b2b;
     color: #e0e0e0;
-    font-family: "Segoe UI", "Ubuntu", sans-serif;
+    font-family: ".AppleSystemUIFont", "SF Pro Text", "Helvetica Neue", "Segoe UI", "Ubuntu", sans-serif;
     font-size: 12px;
 }
 

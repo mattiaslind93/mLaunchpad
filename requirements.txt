@@ -1,1 +1,5 @@
-PyQt6>=6.4.0
+# PyQt6-bindningarna och Qt6-biblioteken MÅSTE ha samma version – annars avvisar
+# Qt sina plattforms-plugins vid start (tom plugin-sökväg → appen kraschar direkt).
+# Pinna därför båda till samma version.
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.0

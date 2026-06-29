@@ -2,9 +2,10 @@
 
 import json
 import os
-import re
 from pathlib import Path
 from typing import Optional
+
+from .platform_utils import default_sources, discover_blender_versions
 
 
 class HomeLaunchPad:
@@ -24,8 +25,6 @@ class HomeLaunchPad:
         "tools",
     }
 
-    BLENDER_CONFIG_DIR = Path.home() / "Dokument" / "Blender" / "blender_config"
-
     def __init__(self):
         self.config = self._load_config()
         self._ensure_latest_blender()
@@ -44,20 +43,9 @@ class HomeLaunchPad:
                     config = self._migrate_config(config)
                 return config
 
-        # Create default config with sources
+        # Create default config with platform-appropriate sources
         default_config = {
-            "sources": {
-                "milford": {
-                    "name": "Milford",
-                    "jobs_path": "/var/mnt/jack/JOBS",
-                    "system_path": "/var/mnt/jack/SYSTEM",
-                },
-                "private": {
-                    "name": "Privat",
-                    "jobs_path": "/home/mlind/Insync/mattiaslind93@gmail.com/Google Drive/Pipeline",
-                    "system_path": "/var/mnt/jack/SYSTEM",
-                },
-            },
+            "sources": default_sources(),
             "current_source": "private",
             "user_name": os.environ.get("USER", "unknown"),
             "blender_executable": self._get_latest_blender_executable() or "",
@@ -71,20 +59,17 @@ class HomeLaunchPad:
         return default_config
 
     def _migrate_config(self, old_config: dict) -> dict:
-        """Migrate old config format to new format with sources."""
+        """Migrate old single-source config format to the new sources format."""
+        sources = default_sources()
+        # Preserve any explicit paths from the old flat config.
+        if old_config.get("jobs_path"):
+            sources["milford"]["jobs_path"] = old_config["jobs_path"]
+        if old_config.get("system_path"):
+            sources["milford"]["system_path"] = old_config["system_path"]
+            sources["private"]["system_path"] = old_config["system_path"]
+
         new_config = {
-            "sources": {
-                "milford": {
-                    "name": "Milford",
-                    "jobs_path": old_config.get("jobs_path", "/var/mnt/jack/JOBS"),
-                    "system_path": old_config.get("system_path", "/var/mnt/jack/SYSTEM"),
-                },
-                "private": {
-                    "name": "Privat",
-                    "jobs_path": "/home/mlind/Insync/mattiaslind93@gmail.com/Google Drive/Pipeline",
-                    "system_path": old_config.get("system_path", "/var/mnt/jack/SYSTEM"),
-                },
-            },
+            "sources": sources,
             "current_source": "private",
             "user_name": old_config.get("user_name", os.environ.get("USER", "unknown")),
             "blender_executable": old_config.get("blender_executable", ""),
@@ -172,27 +157,15 @@ class HomeLaunchPad:
         return self.config["blender_executable"]
 
     def get_available_blender_versions(self) -> list[tuple[str, str]]:
-        """Discover available Blender versions from the blender_config directory.
+        """Discover available Blender versions for the current platform.
+
+        On macOS this scans for ``Blender*.app`` bundles in /Applications and
+        ~/Applications; on Linux it scans the extracted blender_config builds.
 
         Returns:
             List of (version_string, executable_path) tuples, sorted newest first.
         """
-        versions = []
-        if not self.BLENDER_CONFIG_DIR.exists():
-            return versions
-
-        pattern = re.compile(r"^blender-(\d+\.\d+\.\d+)-linux-x64$")
-        for entry in self.BLENDER_CONFIG_DIR.iterdir():
-            if entry.is_dir():
-                match = pattern.match(entry.name)
-                if match:
-                    executable = entry / "blender"
-                    if executable.exists():
-                        versions.append((match.group(1), str(executable)))
-
-        # Sort by version number, newest first
-        versions.sort(key=lambda v: [int(x) for x in v[0].split(".")], reverse=True)
-        return versions
+        return discover_blender_versions()
 
     def _get_latest_blender_executable(self) -> Optional[str]:
         """Return the executable path for the latest available Blender version."""
